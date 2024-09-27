@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+    <title>Kuksa info printaaja</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Special Elite', cursive;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+            padding: 4px; /* Reduced padding */
+            text-align: left;
+            font-size: 16px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .alternative_color {
+            background-color: #c0e6f1; /* Light gray background for alternative rows */
+        }
+    </style>
+</head>
+<body>
+    <h1><br>Lataa tiedostosi alhaala olevasta browse napista</h1>
+    <input type="file" id="upload" accept=".xlsx" />
+    <button onclick="printTable()">Printtaa</button>
+    <div id="output"></div>
+
+    <script>
+        document.getElementById('upload').addEventListener('change', handleFile, false);
+
+        function handleFile(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                let huoltajatColIndex = -1;  // Variable to store the index of the "Huoltajat" column
+                
+                // Check if the first row contains "Huoltajat" and determine its index
+                const firstRow = json[0];
+                if (firstRow) {
+                    huoltajatColIndex = firstRow.indexOf('Huoltajat');
+                }
+
+                // If the "Huoltajat" column exists, change its first cell to "Huoltajien Numerot"
+                if (huoltajatColIndex !== -1) {
+                    firstRow[huoltajatColIndex] = 'Huoltajien Numerot';
+                }
+
+                // Process rows, removing the first column, keeping the header intact
+                const modifiedJson = json.map((row, index) => {
+                    // Remove the first column
+                    row = row.slice(1);
+
+                    // If "Huoltajat" column exists, filter it for phone numbers
+                    if (huoltajatColIndex !== -1 && index > 0 && row[huoltajatColIndex - 1]) {  // Adjust index due to column removal
+                        const phoneNumber = row[huoltajatColIndex - 1].toString().match(/(\+358\d{5,}|04\d{5,})/);
+                        row[huoltajatColIndex - 1] = phoneNumber ? phoneNumber[0] : '';  // Retain matched number or empty string
+                    }
+
+                    return row;
+                });
+
+                displayTable(modifiedJson);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function displayTable(data) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = ''; // Clear previous table
+
+            const table = document.createElement('table');
+            data.forEach((row, index) => {
+                const tr = document.createElement('tr');
+
+                // Apply alternative_color class to every other row (even index rows)
+                if (index % 2 === 0) {
+                    tr.classList.add('alternative_color');
+                }
+
+                row.forEach((cell) => {
+                    const td = document.createElement('td');
+                    td.textContent = cell !== undefined ? cell : '';
+                    tr.appendChild(td);
+                });
+
+                table.appendChild(tr);
+            });
+            outputDiv.appendChild(table);
+        }
+
+        // Function to print the table
+        function printTable() {
+            const originalContent = document.body.innerHTML;
+            const tableContent = document.getElementById('output').innerHTML;
+            document.body.innerHTML = tableContent;
+            window.print();
+            document.body.innerHTML = originalContent;
+        }
+    </script>
+</body>
+</html>
